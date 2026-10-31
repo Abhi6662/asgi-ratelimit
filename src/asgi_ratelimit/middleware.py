@@ -88,7 +88,13 @@ class RateLimitMiddleware:
         return "unknown"
 
     def _is_exempt(self, request: Request) -> bool:
-        """Check if request path/method is exempt from rate limiting."""
+        """Check if request path/method is exempt from rate limiting.
+
+        Supports:
+        - Exact path matches (e.g., "/health")
+        - Prefix matches with wildcard (e.g., "/health*" matches "/healthz", "/health/check")
+        - HTTP method exemptions (e.g., OPTIONS, HEAD)
+        """
         path = request.url.path
         method = request.method
 
@@ -96,9 +102,14 @@ class RateLimitMiddleware:
         if path in self.exempt_paths:
             return True
 
-        # Check prefix match (e.g., /health, /metrics)
+        # Check prefix match with wildcard support
+        # e.g., exempt_paths={"/health*"} matches "/health", "/healthz", "/health/check"
         for exempt in self.exempt_paths:
-            if path.startswith(exempt.rstrip("*")):
+            if exempt.endswith("*"):
+                prefix = exempt[:-1]
+                if path.startswith(prefix):
+                    return True
+            elif path.startswith(exempt):
                 return True
 
         if method in self.exempt_methods:
