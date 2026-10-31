@@ -1,0 +1,64 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "asgi-ratelimit"
+version = "0.1.0"
+description = "ASGI middleware for token-bucket and sliding-window rate limiting"
+readme = "README.md"
+license = {text = "MIT"}
+authors = [
+    {name = "Abhishek Mandloi", email = "163866821+Abhi6662@users.noreply.github.com"}
+]
+maintainers = [
+    {name = "Abhishek Mandloi", email = "163866821+Abhi6662@users.noreply.github.com"}
+]
+keywords = ["asgi", "rate-limiting", "middleware", "fastapi", "starlette"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+requires-python = ">=3.10"
+dependencies = [
+    "starlette>=0.37.0",
+]
+dynamic = []
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4.0",
+    "pytest-asyncio>=0.21.0",
+    "httpx>=0.24.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/Abhi6662/asgi-ratelimit"
+Repository = "https://github.com/Abhi6662/asgi-ratelimit"
+Issues = "https://github.com/Abhi6662/asgi-ratelimit/issues"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["asgi_ratelimit*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+asyncio_mode = "auto"
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_ignores = true
+disallow_untyped_defs = true
