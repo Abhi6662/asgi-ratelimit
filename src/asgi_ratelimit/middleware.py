@@ -69,10 +69,10 @@ class RateLimitMiddleware:
         # Initialize store
         if store is not None:
             self.store = store
-        elif strategy == "token_bucket":
-            self.store = InMemoryStore()
         else:
-            self.store = SQLiteStore(store_path)
+            # Use InMemoryStore by default for both strategies
+            # SQLiteStore can be explicitly passed for persistence
+            self.store = InMemoryStore()
 
         # For token bucket: store token counts per key with last refill time
         self._token_data: dict[str, tuple[float, float]] = {}  # key -> (tokens, last_refill)
@@ -243,7 +243,6 @@ def create_rate_limiter(
     exempt_paths: Optional[Set[str]] = None,
     exempt_methods: Optional[Set[str]] = None,
     store: Optional[RateLimitStore] = None,
-    store_path: str = "ratelimit.db",
 ) -> Callable[[ASGIApp], ASGIApp]:
     """
     Factory function to create a rate limiter middleware.
@@ -272,6 +271,5 @@ def create_rate_limiter(
             exempt_paths=exempt_paths,
             exempt_methods=exempt_methods,
             store=store,
-            store_path=store_path,
         )
     return middleware
