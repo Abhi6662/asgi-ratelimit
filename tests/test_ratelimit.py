@@ -3,27 +3,33 @@
 import pytest
 from starlette.applications import Starlette
 from starlette.responses import PlainTextResponse
+from starlette.routing import Route
 from starlette.testclient import TestClient
 
 from asgi_ratelimit import RateLimitMiddleware, InMemoryStore, SQLiteStore
 from asgi_ratelimit.middleware import create_rate_limiter
 
 
+def _homepage(request):
+    return PlainTextResponse("OK")
+
+
+def _health(request):
+    return PlainTextResponse("healthy")
+
+
 # --- Token Bucket Tests ---
+
 
 def test_token_bucket_allows_requests_under_limit():
     """Token bucket should allow requests under capacity."""
-    app = Starlette()
+    app = Starlette(routes=[Route("/", _homepage, methods=["GET"])])
     app.add_middleware(
         RateLimitMiddleware,
         strategy="token_bucket",
         capacity=5,
         refill_rate=10.0,
     )
-
-    @app.route("/")
-    async def homepage(request):
-        return PlainTextResponse("OK")
 
     client = TestClient(app, raise_server_exceptions=False)
 
@@ -36,17 +42,13 @@ def test_token_bucket_allows_requests_under_limit():
 
 def test_token_bucket_blocks_over_limit():
     """Token bucket should return 429 when capacity exceeded."""
-    app = Starlette()
+    app = Starlette(routes=[Route("/", _homepage, methods=["GET"])])
     app.add_middleware(
         RateLimitMiddleware,
         strategy="token_bucket",
         capacity=2,
         refill_rate=0.1,  # Very slow refill
     )
-
-    @app.route("/")
-    async def homepage(request):
-        return PlainTextResponse("OK")
 
     client = TestClient(app, raise_server_exceptions=False)
 
@@ -65,17 +67,13 @@ def test_token_bucket_blocks_over_limit():
 
 def test_token_bucket_refill_over_time():
     """Token bucket should refill tokens over time."""
-    app = Starlette()
+    app = Starlette(routes=[Route("/", _homepage, methods=["GET"])])
     app.add_middleware(
         RateLimitMiddleware,
         strategy="token_bucket",
         capacity=2,
         refill_rate=100.0,  # Fast refill for test
     )
-
-    @app.route("/")
-    async def homepage(request):
-        return PlainTextResponse("OK")
 
     client = TestClient(app, raise_server_exceptions=False)
 
@@ -95,17 +93,13 @@ def test_token_bucket_refill_over_time():
 
 def test_token_bucket_headers_present():
     """All standard rate limit headers should be present."""
-    app = Starlette()
+    app = Starlette(routes=[Route("/", _homepage, methods=["GET"])])
     app.add_middleware(
         RateLimitMiddleware,
         strategy="token_bucket",
         capacity=10,
         refill_rate=5.0,
     )
-
-    @app.route("/")
-    async def homepage(request):
-        return PlainTextResponse("OK")
 
     client = TestClient(app, raise_server_exceptions=False)
     response = client.get("/")
@@ -120,7 +114,7 @@ def test_token_bucket_custom_key_func():
     def api_key_func(request):
         return request.headers.get("X-API-Key", "anonymous")
 
-    app = Starlette()
+    app = Starlette(routes=[Route("/", _homepage, methods=["GET"])])
     app.add_middleware(
         RateLimitMiddleware,
         strategy="token_bucket",
@@ -128,10 +122,6 @@ def test_token_bucket_custom_key_func():
         refill_rate=0.1,
         key_func=api_key_func,
     )
-
-    @app.route("/")
-    async def homepage(request):
-        return PlainTextResponse("OK")
 
     client = TestClient(app, raise_server_exceptions=False)
 
@@ -150,7 +140,10 @@ def test_token_bucket_custom_key_func():
 
 def test_token_bucket_route_exemption():
     """Exempt paths should bypass rate limiting."""
-    app = Starlette()
+    app = Starlette(routes=[
+        Route("/", _homepage, methods=["GET"]),
+        Route("/health", _health, methods=["GET"]),
+    ])
     app.add_middleware(
         RateLimitMiddleware,
         strategy="token_bucket",
@@ -158,14 +151,6 @@ def test_token_bucket_route_exemption():
         refill_rate=0.1,
         exempt_paths={"/health", "/metrics"},
     )
-
-    @app.route("/")
-    async def homepage(request):
-        return PlainTextResponse("OK")
-
-    @app.route("/health")
-    async def health(request):
-        return PlainTextResponse("healthy")
 
     client = TestClient(app, raise_server_exceptions=False)
 
@@ -183,19 +168,16 @@ def test_token_bucket_route_exemption():
 
 # --- Sliding Window Tests ---
 
+
 def test_sliding_window_allows_requests_under_limit():
     """Sliding window should allow requests under max_requests."""
-    app = Starlette()
+    app = Starlette(routes=[Route("/", _homepage, methods=["GET"])])
     app.add_middleware(
         RateLimitMiddleware,
         strategy="sliding_window",
         max_requests=3,
         window_seconds=60,
     )
-
-    @app.route("/")
-    async def homepage(request):
-        return PlainTextResponse("OK")
 
     client = TestClient(app, raise_server_exceptions=False)
 
@@ -209,17 +191,13 @@ def test_sliding_window_allows_requests_under_limit():
 
 def test_sliding_window_blocks_over_limit():
     """Sliding window should return 429 when max_requests exceeded."""
-    app = Starlette()
+    app = Starlette(routes=[Route("/", _homepage, methods=["GET"])])
     app.add_middleware(
         RateLimitMiddleware,
         strategy="sliding_window",
         max_requests=2,
         window_seconds=60,
     )
-
-    @app.route("/")
-    async def homepage(request):
-        return PlainTextResponse("OK")
 
     client = TestClient(app, raise_server_exceptions=False)
 
@@ -231,6 +209,7 @@ def test_sliding_window_blocks_over_limit():
 
 
 # --- Store Tests ---
+
 
 def test_in_memory_store_basic():
     """InMemoryStore basic operations."""
@@ -305,15 +284,12 @@ def test_sqlite_store_wal_mode():
 
 # --- Factory Function Tests ---
 
+
 def test_create_rate_limiter_factory():
     """create_rate_limiter factory should return middleware."""
     limiter = create_rate_limiter(strategy="token_bucket", capacity=5, refill_rate=1.0)
-    app = Starlette()
+    app = Starlette(routes=[Route("/", _homepage, methods=["GET"])])
     app.add_middleware(limiter)
-
-    @app.route("/")
-    async def homepage(request):
-        return PlainTextResponse("OK")
 
     client = TestClient(app, raise_server_exceptions=False)
     response = client.get("/")
@@ -322,7 +298,7 @@ def test_create_rate_limiter_factory():
 
 def test_exempt_methods():
     """Exempt HTTP methods should bypass rate limiting."""
-    app = Starlette()
+    app = Starlette(routes=[Route("/", _homepage, methods=["GET", "OPTIONS", "HEAD"])])
     app.add_middleware(
         RateLimitMiddleware,
         strategy="token_bucket",
@@ -330,10 +306,6 @@ def test_exempt_methods():
         refill_rate=0.1,
         exempt_methods={"OPTIONS", "HEAD"},
     )
-
-    @app.route("/", methods=["GET", "OPTIONS", "HEAD"])
-    async def homepage(request):
-        return PlainTextResponse("OK")
 
     client = TestClient(app, raise_server_exceptions=False)
 
@@ -349,11 +321,9 @@ def test_exempt_methods():
 
 # --- Integration Test with FastAPI-like app ---
 
+
 def test_fastapi_style_integration():
     """Integration test with FastAPI-style routing."""
-    from starlette.routing import Route
-    from asgi_ratelimit import InMemoryStore
-
     async def endpoint(request):
         return PlainTextResponse("OK")
 
